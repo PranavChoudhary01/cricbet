@@ -19,37 +19,36 @@ const io = new Server(httpServer, {
   },
 });
 
-// Make io available in controllers via req.app.get('io')
 app.set('io', io);
 
-// ── Security & Parsing ──────────────────────────────────
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
 app.use(apiLimiter);
 
-// ── Routes ──────────────────────────────────────────────
 app.use('/api/auth',    require('./routes/auth'));
 app.use('/api/bets',    require('./routes/bets'));
 app.use('/api/matches', require('./routes/matches'));
 app.use('/api/wallet',  require('./routes/wallet'));
 
-// Health check
 app.get('/health', (req, res) =>
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 );
 
-// ── Socket.io ───────────────────────────────────────────
 require('./socket')(io);
 
-// ── Error Handler (always last) ─────────────────────────
 app.use(errorHandler);
 
-// ── Start ───────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 
 const start = async () => {
   await redis.connect();
+
+  // Auto migrate on startup
+  const db = require('./config/database')
+  await db.migrate.latest()
+  logger.info('Database migrations complete ✅')
+
   httpServer.listen(PORT, () => {
     logger.info(`🏏 CricBet server running on http://localhost:${PORT}`);
   });
