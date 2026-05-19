@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const http = require('http');
+const path = require('path');
 const { Server } = require('socket.io');
 const helmet = require('helmet');
 const cors = require('cors');
@@ -36,7 +37,6 @@ app.get('/health', (req, res) =>
 );
 
 require('./socket')(io);
-
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
@@ -44,9 +44,10 @@ const PORT = process.env.PORT || 3000;
 const start = async () => {
   await redis.connect();
 
-  // Auto migrate on startup
   const db = require('./config/database')
-  await db.migrate.latest()
+  await db.migrate.latest({
+    directory: path.join(__dirname, '../scripts/migrations')
+  })
   logger.info('Database migrations complete ✅')
 
   httpServer.listen(PORT, () => {
