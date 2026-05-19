@@ -4,7 +4,8 @@ let socket = null
 
 export const getSocket = () => {
   if (!socket) {
-    socket = io('/', {
+    const URL = import.meta.env.VITE_API_URL || window.location.origin
+    socket = io(URL, {
       auth: { token: localStorage.getItem('cb_token') },
       transports: ['websocket'],
     })
