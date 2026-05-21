@@ -49,6 +49,8 @@ export default function App() {
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<HomePage />} />
+        <Route path="/trading" element={<TradingPage />} />
+        <Route path="/trading/:matchId" element={<TradingPage />} />
         <Route path="/ipl" element={<HomePage />} />
         <Route path="/international" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
