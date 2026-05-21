@@ -7,6 +7,7 @@ const NAV_LINKS = [
   { label: '🏏 Live', href: '/' },
   { label: 'IPL 2026', href: '/ipl' },
   { label: 'International', href: '/international' },
+  { label: '📈 Trading', href: '/trading' },
   { label: 'My Bets', href: '/my-bets' },
 ]
 

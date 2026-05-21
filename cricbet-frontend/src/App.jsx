@@ -10,6 +10,7 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import MyBetsPage from './pages/MyBetsPage'
 import WalletPage from './pages/WalletPage'
+import TradingPage from './pages/TradingPage'
 
 import { useAuthStore } from './store/authStore'
 
@@ -52,7 +53,7 @@ export default function App() {
         <Route path="/international" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
-
+        <Route path="/trading" element={<TradingPage />} />
         {/* Protected routes */}
         <Route path="/my-bets" element={
           <ProtectedRoute><MyBetsPage /></ProtectedRoute>
