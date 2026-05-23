@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import Chart from 'chart.js/auto'
 
 const generateCandles = (count = 24) => {
@@ -21,6 +22,13 @@ const BEAR = '#E24B4A'
 const WICK = '#888780'
 
 export default function TradingPage() {
+  const { state } = useLocation()
+  const match = state?.match
+  const matchName = match ? `${match.team_a} vs ${match.team_b}` : 'MI vs CSK'
+  const matchInfo = match ? `${match.match_type} · ${match.venue || ''}` : 'IPL 2026 · Wankhede'
+  const teamA = match?.team_a || 'MI'
+  const teamB = match?.team_b || 'CSK'
+
   const canvasRef = useRef(null)
   const chartRef = useRef(null)
   const candlesRef = useRef(generateCandles())
@@ -30,11 +38,8 @@ export default function TradingPage() {
   const [changeUp, setChangeUp] = useState(true)
   const [stake, setStake] = useState(500)
   const [orderOdds, setOrderOdds] = useState(1.82)
-  const [positions, setPositions] = useState([
-    { id: 1, type: 'BUY', entry: 2.10, stake: 500, pnl: -140 },
-    { id: 2, type: 'LAY', entry: 2.30, stake: 300, pnl: 230 },
-  ])
-  const [nextId, setNextId] = useState(3)
+  const [positions, setPositions] = useState([])
+  const [nextId, setNextId] = useState(1)
   const isMobile = window.innerWidth < 768
 
   const payout = parseFloat(((orderOdds - 1) * stake).toFixed(0))
@@ -135,12 +140,14 @@ export default function TradingPage() {
 
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: isMobile ? '16px 12px' : '28px 24px' }}>
+
+      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
         <div>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: isMobile ? 18 : 22, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.4px' }}>
-            MI vs CSK — Odds Trading
+            {matchName} — Odds Trading
           </h1>
-          <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>IPL 2026 · Over 14.3 · MI 128/4</p>
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>{matchInfo}</p>
         </div>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(29,158,117,0.12)', color: '#0F6E56', fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 20, border: '1px solid rgba(29,158,117,0.25)' }}>
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#1D9E75', display: 'inline-block' }} />
@@ -148,7 +155,8 @@ export default function TradingPage() {
         </span>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, marginBottom: 16 }}>
+      {/* Stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 8, marginBottom: 16 }}>
         {[
           { label: 'Current Odds', val: currentOdds.toFixed(2), color: 'var(--text-primary)' },
           { label: 'Change', val: change, color: changeUp ? '#1D9E75' : '#E24B4A' },
@@ -162,9 +170,12 @@ export default function TradingPage() {
         ))}
       </div>
 
+      {/* Candlestick Chart */}
       <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 16, marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>MI Win Odds — Candlestick</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>
+            {teamA} Win Odds — Candlestick
+          </span>
           <div style={{ display: 'flex', gap: 4 }}>
             {['1B', '2B', '5B', '1O'].map((tf, i) => (
               <button key={tf} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--border)', background: i === 0 ? 'var(--bg-elevated)' : 'transparent', color: i === 0 ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: 'pointer' }}>{tf}</button>
@@ -184,45 +195,71 @@ export default function TradingPage() {
         </div>
       </div>
 
+      {/* Order + Positions */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
+
+        {/* Order Panel */}
         <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-display)', marginBottom: 14 }}>Place Order</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-display)', marginBottom: 14 }}>
+            Place Order — {teamA} Win
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
-            <button onClick={() => placeOrder('BUY')} style={{ padding: '11px', borderRadius: 10, border: 'none', background: '#1D9E75', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>BUY BACK</button>
-            <button onClick={() => placeOrder('LAY')} style={{ padding: '11px', borderRadius: 10, border: 'none', background: '#E24B4A', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>LAY</button>
+            <button onClick={() => placeOrder('BUY')} style={{ padding: '11px', borderRadius: 10, border: 'none', background: '#1D9E75', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+              BUY BACK
+            </button>
+            <button onClick={() => placeOrder('LAY')} style={{ padding: '11px', borderRadius: 10, border: 'none', background: '#E24B4A', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+              LAY
+            </button>
           </div>
           <div style={{ marginBottom: 10 }}>
             <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 5 }}>Odds</div>
-            <input type="number" value={orderOdds.toFixed(2)} step="0.01" onChange={e => setOrderOdds(parseFloat(e.target.value))} style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 9, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none' }} />
+            <input type="number" value={orderOdds.toFixed(2)} step="0.01"
+              onChange={e => setOrderOdds(parseFloat(e.target.value))}
+              style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 9, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none' }}
+            />
           </div>
           <div style={{ marginBottom: 10 }}>
             <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 5 }}>Stake (₹)</div>
-            <input type="number" value={stake} step="100" onChange={e => setStake(parseFloat(e.target.value))} style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 9, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none' }} />
+            <input type="number" value={stake} step="100"
+              onChange={e => setStake(parseFloat(e.target.value))}
+              style={{ width: '100%', padding: '9px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 9, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none' }}
+            />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 10, borderTop: '1px solid var(--border)', fontSize: 13 }}>
             <span style={{ color: 'var(--text-secondary)' }}>Potential P&L</span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: '#1D9E75' }}>+₹{payout.toLocaleString('en-IN')}</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: '#1D9E75' }}>
+              +₹{payout.toLocaleString('en-IN')}
+            </span>
           </div>
         </div>
 
+        {/* Positions */}
         <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-display)', marginBottom: 14 }}>Open Positions ({positions.length})</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-display)', marginBottom: 14 }}>
+            Open Positions ({positions.length})
+          </div>
           {positions.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-secondary)', fontSize: 13 }}>Koi open position nahi</div>
+            <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-secondary)', fontSize: 13 }}>
+              Koi open position nahi — Buy ya Lay karo!
+            </div>
           ) : (
             positions.map(p => (
               <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
-                    MI Win — <span style={{ color: p.type === 'BUY' ? '#1D9E75' : '#E24B4A' }}>{p.type}</span>
+                    {teamA} Win — <span style={{ color: p.type === 'BUY' ? '#1D9E75' : '#E24B4A' }}>{p.type}</span>
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>Entry: {p.entry.toFixed(2)} · Stake: ₹{p.stake.toLocaleString('en-IN')}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
+                    Entry: {p.entry.toFixed(2)} · Stake: ₹{p.stake.toLocaleString('en-IN')}
+                  </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: p.pnl >= 0 ? '#1D9E75' : '#E24B4A', marginBottom: 4 }}>
                     {p.pnl >= 0 ? '+' : ''}₹{Math.abs(p.pnl).toLocaleString('en-IN')}
                   </div>
-                  <button onClick={() => exitPosition(p.id)} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}>Exit</button>
+                  <button onClick={() => exitPosition(p.id)} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                    Exit
+                  </button>
                 </div>
               </div>
             ))
