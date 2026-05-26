@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
 import Chart from 'chart.js/auto'
 
-const generateCandles = (count = 24) => {
+const generateCandles = (count = 30) => {
   const candles = []
   let price = 2.10
   for (let i = 0; i < count; i++) {
@@ -21,6 +21,8 @@ const BULL = '#1D9E75'
 const BEAR = '#E24B4A'
 const WICK = '#888780'
 
+const TF_COUNTS = { '1B': 10, '2B': 15, '5B': 20, '1O': 30 }
+
 export default function TradingPage() {
   const { state } = useLocation()
   const match = state?.match
@@ -32,7 +34,9 @@ export default function TradingPage() {
   const chartRef = useRef(null)
   const candlesRef = useRef(generateCandles())
   const intervalRef = useRef(null)
+  const timeframeRef = useRef('1B')
 
+  const [timeframe, setTimeframe] = useState('1B')
   const [currentOdds, setCurrentOdds] = useState(1.82)
   const [change, setChange] = useState('+0.12')
   const [changeUp, setChangeUp] = useState(true)
@@ -48,8 +52,27 @@ export default function TradingPage() {
 
   const payout = parseFloat(((orderOdds - 1) * stake).toFixed(0))
 
-  const addLog = (msg, color = '#1D9E75') => {
+  const addLog = useCallback((msg, color = '#1D9E75') => {
     setLog(prev => [{ msg, color, time: new Date().toLocaleTimeString('en-IN') }, ...prev.slice(0, 9)])
+  }, [])
+
+  const getVisibleCandles = useCallback(() => {
+    const count = TF_COUNTS[timeframeRef.current] || 10
+    return candlesRef.current.slice(-count)
+  }, [])
+
+  const refreshChart = useCallback(() => {
+    if (!chartRef.current) return
+    const visible = getVisibleCandles()
+    chartRef.current.data.labels = visible.map((_, i) => `B${i + 1}`)
+    chartRef.current.data.datasets[0].data = visible.map(c => c.c)
+    chartRef.current.update('none')
+  }, [getVisibleCandles])
+
+  const handleTimeframe = (tf) => {
+    setTimeframe(tf)
+    timeframeRef.current = tf
+    refreshChart()
   }
 
   useEffect(() => {
@@ -59,14 +82,15 @@ export default function TradingPage() {
       id: 'candlestick',
       afterDatasetsDraw(chart) {
         const { ctx, scales: { x, y } } = chart
-        candlesRef.current.forEach((c, i) => {
+        const visible = getVisibleCandles()
+        visible.forEach((c, i) => {
           const xPos = x.getPixelForValue(i)
           const oY = y.getPixelForValue(c.o)
           const cY = y.getPixelForValue(c.c)
           const hY = y.getPixelForValue(c.h)
           const lY = y.getPixelForValue(c.l)
           const color = c.c >= c.o ? BULL : BEAR
-          const bw = Math.max(6, (x.width / candlesRef.current.length) * 0.55)
+          const bw = Math.max(6, (x.width / visible.length) * 0.55)
           ctx.save()
           ctx.strokeStyle = WICK
           ctx.lineWidth = 1
@@ -81,12 +105,13 @@ export default function TradingPage() {
       },
     }
 
+    const visible = getVisibleCandles()
     chartRef.current = new Chart(canvasRef.current, {
       type: 'line',
       plugins: [plugin],
       data: {
-        labels: candlesRef.current.map((_, i) => `B${i + 1}`),
-        datasets: [{ data: candlesRef.current.map(c => c.c), borderColor: 'transparent', pointRadius: 0 }],
+        labels: visible.map((_, i) => `B${i + 1}`),
+        datasets: [{ data: visible.map(c => c.c), borderColor: 'transparent', pointRadius: 0 }],
       },
       options: {
         responsive: true,
@@ -109,7 +134,7 @@ export default function TradingPage() {
         l: parseFloat((Math.min(last.c, newClose) - Math.random() * 0.05).toFixed(2)),
         c: newClose,
       }
-      candlesRef.current = [...candlesRef.current.slice(-29), newCandle]
+      candlesRef.current = [...candlesRef.current.slice(-59), newCandle]
 
       setCurrentOdds(prev => {
         const diff = parseFloat((newClose - prev).toFixed(2))
@@ -119,29 +144,24 @@ export default function TradingPage() {
         return newClose
       })
 
-      // Auto-cut logic
       setPositions(prev => {
         const updated = prev.map(p => ({
           ...p,
           pnl: Math.round((newClose - p.entry) * p.stake * (p.type === 'BUY' ? 1 : -1)),
         }))
-
         const remaining = []
         updated.forEach(p => {
           const sl = parseFloat(p.stopLoss)
           const tgt = parseFloat(p.target)
           const pnl = p.pnl
-
-          // Target hit
           if (tgt && pnl >= tgt) {
             setWallet(w => parseFloat((w + p.stake + pnl).toFixed(2)))
-            addLog(`✅ Target hit! ${teamA} ${p.type} — +₹${pnl} | Wallet updated`, '#1D9E75')
+            addLog(`✅ Target hit! ${p.type} — +₹${pnl}`, '#1D9E75')
             return
           }
-          // Stop loss hit
           if (sl && pnl <= -sl) {
             setWallet(w => parseFloat((w + p.stake + pnl).toFixed(2)))
-            addLog(`🛑 Stop loss hit! ${teamA} ${p.type} — -₹${Math.abs(pnl)} | Wallet updated`, '#E24B4A')
+            addLog(`🛑 Stop loss hit! ${p.type} — -₹${Math.abs(pnl)}`, '#E24B4A')
             return
           }
           remaining.push(p)
@@ -149,11 +169,7 @@ export default function TradingPage() {
         return remaining
       })
 
-      if (chartRef.current) {
-        chartRef.current.data.labels = candlesRef.current.map((_, i) => `B${i + 1}`)
-        chartRef.current.data.datasets[0].data = candlesRef.current.map(c => c.c)
-        chartRef.current.update('none')
-      }
+      refreshChart()
     }, 2000)
 
     return () => {
@@ -169,22 +185,20 @@ export default function TradingPage() {
     }
     setWallet(w => parseFloat((w - stake).toFixed(2)))
     setPositions(prev => [...prev, {
-      id: nextId,
-      type,
+      id: nextId, type,
       entry: parseFloat(orderOdds.toFixed(2)),
-      stake,
-      pnl: 0,
+      stake, pnl: 0,
       stopLoss: stopLoss || null,
       target: target || null,
     }])
     setNextId(n => n + 1)
-    addLog(`📈 ${type} placed @ ${orderOdds.toFixed(2)} | Stake: ₹${stake} | SL: ${stopLoss || 'None'} | Target: ${target || 'None'}`, type === 'BUY' ? '#1D9E75' : '#E24B4A')
+    addLog(`📈 ${type} @ ${orderOdds.toFixed(2)} | Stake: ₹${stake} | SL: ${stopLoss || 'None'} | TGT: ${target || 'None'}`, type === 'BUY' ? '#1D9E75' : '#E24B4A')
   }
 
   const exitPosition = (p) => {
     setWallet(w => parseFloat((w + p.stake + p.pnl).toFixed(2)))
     setPositions(prev => prev.filter(pos => pos.id !== p.id))
-    addLog(`🚪 Manual exit — ${p.type} | P&L: ${p.pnl >= 0 ? '+' : ''}₹${p.pnl}`, p.pnl >= 0 ? '#1D9E75' : '#E24B4A')
+    addLog(`🚪 Exit ${p.type} | P&L: ${p.pnl >= 0 ? '+' : ''}₹${p.pnl}`, p.pnl >= 0 ? '#1D9E75' : '#E24B4A')
   }
 
   const totalPnl = positions.reduce((s, p) => s + p.pnl, 0)
@@ -201,7 +215,6 @@ export default function TradingPage() {
           <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>{matchInfo}</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {/* Wallet */}
           <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 10, padding: '7px 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Wallet</span>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: wallet >= 10000 ? '#1D9E75' : wallet > 5000 ? 'var(--text-primary)' : '#E24B4A' }}>
@@ -237,8 +250,21 @@ export default function TradingPage() {
             {teamA} Win Odds — Candlestick
           </span>
           <div style={{ display: 'flex', gap: 4 }}>
-            {['1B', '2B', '5B', '1O'].map((tf, i) => (
-              <button key={tf} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--border)', background: i === 0 ? 'var(--bg-elevated)' : 'transparent', color: i === 0 ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: 'pointer' }}>{tf}</button>
+            {['1B', '2B', '5B', '1O'].map((tf) => (
+              <button
+                key={tf}
+                onClick={() => handleTimeframe(tf)}
+                style={{
+                  fontSize: 11, padding: '4px 10px', borderRadius: 6,
+                  border: `1px solid ${timeframe === tf ? 'var(--accent)' : 'var(--border)'}`,
+                  background: timeframe === tf ? 'var(--accent)' : 'transparent',
+                  color: timeframe === tf ? '#080b0f' : 'var(--text-secondary)',
+                  cursor: 'pointer', fontWeight: timeframe === tf ? 700 : 400,
+                  transition: 'all 0.15s',
+                }}
+              >
+                {tf}
+              </button>
             ))}
           </div>
         </div>
@@ -271,7 +297,6 @@ export default function TradingPage() {
               LAY
             </button>
           </div>
-
           {[
             { label: 'Odds', val: orderOdds.toFixed(2), setter: v => setOrderOdds(parseFloat(v)), step: '0.01' },
             { label: 'Stake (₹)', val: stake, setter: v => setStake(parseFloat(v)), step: '100' },
@@ -288,7 +313,6 @@ export default function TradingPage() {
               />
             </div>
           ))}
-
           <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 10, borderTop: '1px solid var(--border)', fontSize: 13 }}>
             <span style={{ color: 'var(--text-secondary)' }}>Potential P&L</span>
             <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: '#1D9E75' }}>+₹{payout.toLocaleString('en-IN')}</span>
